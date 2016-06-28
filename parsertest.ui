@@ -23,6 +23,11 @@
       <height>331</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>Courier New</family>
+     </font>
+    </property>
     <property name="readOnly">
      <bool>true</bool>
     </property>
@@ -35,6 +40,13 @@
       <width>461</width>
       <height>331</height>
      </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Courier New</family>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
     </property>
     <property name="readOnly">
      <bool>true</bool>

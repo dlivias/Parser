@@ -66,6 +66,7 @@ void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude
                                                         // vector_pos = (max - 1) used key position in key_positions
     while (text_pos != end_rude_text_pos)
     {
+        /* Add new item */
         if (vector_pos < key_positions.size() && text_pos == key_positions[vector_pos].begin_key_area_pos)
         {
             ParserTreeItem * p_child = new ParserTreeItem(KeyType(rude_text.substr(text_pos, key_positions[vector_pos].begin_data_pos - text_pos)),
@@ -77,7 +78,8 @@ void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude
             text_pos = key_positions[vector_pos_stack.top()].end_key_area_pos;
             vector_pos_stack.pop();
         }
-        else  // text_pos look on simply text (not key)
+        /* Add new text */
+        else
         {
             unsigned int end_temp_pos;
             if (vector_pos < key_positions.size() && key_positions[vector_pos].begin_key_area_pos < end_rude_text_pos)
@@ -180,22 +182,22 @@ unsigned int ParserTree::findEndDataPosition(const string& s, unsigned int begin
 {
     int count_nested_same_name_keys = 0;
     unsigned int whitespace_pos = key.name.find(' ');
+    const string end_key_str = key.name.substr(whitespace_pos + 1);
     unsigned int find_begin, find_end;
     unsigned int end_key_word;
 
     find_begin = findBeginKeyAreaPosition(s, begin_data_pos, key);
-    find_end = s.find(key.name.substr(whitespace_pos + 1), begin_data_pos);
+    find_end = s.find(end_key_str, begin_data_pos);
 
+    /* Treat nested keys */
     while (find_begin < find_end)
     {
         count_nested_same_name_keys++;
+        /* Find next pair start_key - finish_key */
         end_key_word = findBeginDataPosition(s, find_begin, key);
         find_begin = findBeginKeyAreaPosition(s, end_key_word, key);
-    }
-    while (count_nested_same_name_keys --> 0)
-    {
         end_key_word = findEndKeyAreaPosition(s, find_end, key);
-        find_end = s.find(key.name.substr(whitespace_pos + 1), end_key_word);
+        find_end = s.find(end_key_str, end_key_word);
     }
 
     return find_end;
@@ -238,27 +240,7 @@ string ParserTree::outResult() const
             writeWithIndention(sstream, indent, pItem->row, "//====================\n");
         }
 
-        /* Key data */
-        if (pItem->location_sequence_of_data[pState->location_sequence_num] == ParserTreeItem::TEXT)
-        {
-            writeWithIndention(sstream, indent, pItem->row + 1, "[" + pItem->texts[pState->text_num]);
-            if (pItem->texts[pState->text_num].back() == '\n')
-                writeWithIndention(sstream, indent, pItem->row + 1, "]\n");
-            else
-                sstream << "]\n";
-            pState->text_num++;
-            pState->location_sequence_num++;
-        }
-        else
-        {
-            pState->child_num++;
-            pState->location_sequence_num++;
-            stack.push(ItemAndState(pItem->childs[pState->child_num - 1], zero_state));
-        }
-
-        /* Set last item-state */
-        pItem = stack.top().first;
-        pState = &stack.top().second;
+        // 'end key area' place immediatly after 'new key area' in case of empty key data
 
         /* End key area */
         if (pState->location_sequence_num == pItem->location_sequence_of_data.size())
@@ -270,7 +252,33 @@ string ParserTree::outResult() const
                 pItem = stack.top().first;
                 pState = &stack.top().second;
             }
+            continue;
         }
+
+        /* Key data */
+        if (pItem->location_sequence_of_data.empty() == false)
+        {
+            if (pItem->location_sequence_of_data[pState->location_sequence_num] == ParserTreeItem::TEXT)
+            {
+                writeWithIndention(sstream, indent, pItem->row + 1, "[" + pItem->texts[pState->text_num]);
+                if (pItem->texts[pState->text_num].back() == '\n')
+                    writeWithIndention(sstream, indent, pItem->row + 1, "]\n");
+                else
+                    sstream << "]\n";
+                pState->text_num++;
+                pState->location_sequence_num++;
+            }
+            else
+            {
+                pState->child_num++;
+                pState->location_sequence_num++;
+                stack.push(ItemAndState(pItem->childs[pState->child_num - 1], zero_state));
+            }
+        }
+
+        /* Set last item-state */
+        pItem = stack.top().first;
+        pState = &stack.top().second;
     }
 
     return sstream.str();

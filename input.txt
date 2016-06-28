@@ -1,5 +1,5 @@
 ....
 <html>
-<p><p>text</p>text2</p><p>bug</p>
+<p><p><p></p><p></p></p></p><p><p></p></p>
 </html>
 ...
