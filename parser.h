@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -9,15 +10,13 @@
 #include <algorithm>
 #include <iterator>
 
-using std::string;
-using std::vector;
-using std::set;
+const std::string Tag_list_filename = "C:\\Users\\Admin\\Desktop\\parser_test\\tag list.txt";
 
 class KeyType {
 public:
-    string name;
+    std::string name;
     bool operator<(KeyType key) const { return name < key.name; }
-    explicit KeyType(const string& key_name) : name(key_name) {}
+    explicit KeyType(const std::string& key_name) : name(key_name) {}
 };
 
 class KeyPositionType {
@@ -43,45 +42,49 @@ public:
 
     // data:
     KeyType key;
-    vector<string> texts;
-    vector<ParserTreeItem*> childs;
-    vector<TextOrChild> location_sequence_of_data;
+    std::vector<std::string> texts;
+    std::vector<ParserTreeItem*> childs;
+    std::vector<TextOrChild> location_sequence_of_data;
 
     // methods:
-    ParserTreeItem(KeyType k, int row_position, int column_position = 0);
-    void addText(const string& text_part);
-    void addChild(ParserTreeItem &item);
+    ParserTreeItem(const KeyType& k, int row_position, int column_position = 0);
+    void addText(const std::string& text_part);
+    void addChild(ParserTreeItem& item);
 };
 
 
+// TODO: add read keys from file like in html_parser
 class ParserTree {
     // data:
-private:
-    string rude_text;
-    vector<KeyPositionType> key_positions;
+protected:
+    const std::string& rude_text;
+    std::vector<KeyPositionType> key_positions;
     ParserTreeItem* root_item;
+    std::set<KeyType> keys;
 
 public:
-    vector<ParserTreeItem*> last_find;
+    std::vector<ParserTreeItem*> last_find;
+    std::string error_discription;
 
     // create / destroy object:
-    explicit ParserTree(const string& text);
+    explicit ParserTree(const std::string& text);
     bool createTree();
     ~ParserTree();
 
     // main methods:
     ParserTree& find(const KeyType& key);
-    string outResult() const;
+    std::string outResult() const;
 
 protected:
     // helpful methods:
-    bool findAllKeyPosition(const string& s);
-    unsigned int findBeginKeyAreaPosition(const string& s, unsigned int begin_pos, const KeyType& key) const;
-    unsigned int findBeginDataPosition(const string& s, unsigned int begin_key_area_pos, const KeyType& key) const;
-    unsigned int findEndDataPosition(const string& s, unsigned int begin_data_pos, const KeyType& key) const;
-    unsigned int findEndKeyAreaPosition(const string& s, unsigned int end_data_pos, const KeyType& key) const;
+    bool readKeysFromFile(std::ifstream &fin);
+    bool findAllKeyPosition(const std::string& s);
+    unsigned int findBeginKeyAreaPosition(const std::string& s, unsigned int begin_pos, const KeyType& key) const;
+    unsigned int findBeginDataPosition(const std::string& s, unsigned int begin_key_area_pos, const KeyType& key) const;
+    unsigned int findEndDataPosition(const std::string& s, unsigned int begin_data_pos, const KeyType& key) const;
+    unsigned int findEndKeyAreaPosition(const std::string& s, unsigned int end_data_pos, const KeyType& key) const;
 
-    typedef std::stack<ParserTreeItem*, vector<ParserTreeItem*>> ParserTreeItemStack;
+    typedef std::stack<ParserTreeItem*, std::vector<ParserTreeItem*>> ParserTreeItemStack;
     void SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude_text_position,
                   unsigned int &vector_pos, ParserTreeItem& item);
 };

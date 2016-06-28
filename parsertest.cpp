@@ -33,13 +33,14 @@ void parsertest::loadTextFile()
 void parsertest::loadTree()
 {
      QString inputText(ui->fileEdit->toPlainText());
-     ParserTree tree(inputText.toStdString());
+     std::string inputTextStdString = inputText.toStdString();
+     ParserTree tree(inputTextStdString);
      if (tree.createTree())
      {
          QString outText = QString::fromStdString(tree.outResult());
          ui->parserEdit->setPlainText(outText);
      }
      else
-         ui->parserEdit->setPlainText("Error: can\'t create tree.");
+         ui->parserEdit->setPlainText("Error: can\'t create tree:\n" + QString::fromStdString(tree.error_discription));
 }
 
