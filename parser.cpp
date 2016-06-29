@@ -195,7 +195,6 @@ bool ParserTree::readKeysFromFile(std::ifstream& fin)
 
 /* Set key_positions (all possible positions); Protected */
 // NOTE: May be optimized
-// TODO: Read keys from file
 bool ParserTree::findAllKeyPosition(const std::string& s)
 {
     unsigned int begin_key_area_pos, end_key_area_pos;  // [...)
@@ -234,7 +233,10 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
 unsigned int ParserTree::findBeginKeyAreaPosition(const std::string& s, unsigned int begin_pos, const KeyType& key) const
 {
     unsigned int whitespace_pos = key.name.find(' ');
-    return s.find(key.name.substr(0, whitespace_pos - 1), begin_pos);
+    const std::string& key_word = key.name.substr(0, whitespace_pos - 1);
+    unsigned int find1 = s.find(key_word + '>', begin_pos);
+    unsigned int find2 = s.find(key_word + ' ', begin_pos);
+    return find1 < find2 ? find1 : find2;
 }
 
 unsigned int ParserTree::findBeginDataPosition(const std::string& s, unsigned int begin_key_area_pos, const KeyType& key) const
@@ -265,6 +267,7 @@ unsigned int ParserTree::findEndDataPosition(const std::string& s, unsigned int 
     }
 
     return find_end;
+    //return s.find(key.name.substr(key.name.find(' ')), begin_data_pos);
 }
 
 unsigned int ParserTree::findEndKeyAreaPosition(const std::string& s, unsigned int end_data_pos, const KeyType& key) const
@@ -276,6 +279,9 @@ unsigned int ParserTree::findEndKeyAreaPosition(const std::string& s, unsigned i
 /* Show methods */
 std::string ParserTree::outResult() const
 {
+    if (rude_text.empty())
+        return "";
+
     struct ItemOutputState
     {
         unsigned int location_sequence_num;

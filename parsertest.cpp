@@ -9,6 +9,7 @@ parsertest::parsertest(QWidget *parent) :
     ui(new Ui::parsertest)
 {
     ui->setupUi(this);
+
     loadTextFile();
     loadTree();
 }
