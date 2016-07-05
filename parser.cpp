@@ -1,70 +1,151 @@
 #include "parser.h"
 
-/* Helpful for output function; locale for parser.cpp */
-static void writeWithIndention(std::stringstream &sstream, const std::string& indent, int count_indent, const std::string& s);
+/** Предваряет строку отступом
+ * @details  Вспомогательная локальная функция для вывода дерева в ASCII интерфейсе
+ * Записывает в строку output строку s, предваряя её отступом indent count_indent раз
+ *
+ * @param [out] output - результирующая строка с отступом
+ * @param [in]  indent - отступ (любой набор символов)
+ * @param [in]  count_indent - количество отступов перед строкой
+ * @param [in]  s - строка, которая будет предварена отступами
+ */
+static void writeWithIndention(std::string& output, const std::string& indent, int count_indent, const std::string& s);
 
 
 /* === ParserTreeItem === */
+// Конструктор:
 ParserTreeItem::ParserTreeItem(const KeyType& k, int row_position, int column_position)
-    : row(row_position), column(column_position), key(k)
+    : key(k), row(row_position), column(column_position)
 {
 }
 
+// Чтение полей класса:
+const KeyType& ParserTreeItem::getKey() const                             { return key; }
+const std::vector<std::string>& ParserTreeItem::getTexts() const          { return texts; }
+const std::vector<ParserTreeItem*>& ParserTreeItem::getChilds() const     { return childs; }
+const std::vector<ParserTreeItem::TextOrChild>& ParserTreeItem::getLocationSequenceOfData() const
+{
+    return location_sequence_of_data;
+}
+int ParserTreeItem::getRow() const      { return row; }
+int ParserTreeItem::getColumn() const   { return column; }
+
+
+// Установка полей класса:
 void ParserTreeItem::addText(const std::string& text_part)
 {
     location_sequence_of_data.push_back(TEXT);
     texts.push_back(text_part);
 }
 
-void ParserTreeItem::addChild(ParserTreeItem& item)
+// NOTE: Почему нельзя передать const ParserTreeItem * item
+void ParserTreeItem::addChild(ParserTreeItem *item)
 {
     location_sequence_of_data.push_back(CHILD);
-    childs.push_back(&item);
+    childs.push_back(item);
 }
+
+void ParserTreeItem::deleteLastText()
+{
+    location_sequence_of_data.pop_back();
+    texts.pop_back();
+}
+
+void ParserTreeItem::deleteLastChild()
+{
+    ParserTreeItem* p_item = this->childs.back();
+    ParserTree::ParserTreeItemStack stack;
+
+    /* Удаление дочерних элементов требуемого узла: */
+
+    /* Доходим до крайнего правого нижнего узла,
+        записывая все промежуточные узлы в стек */
+    while(!p_item->childs.empty())
+    {
+        stack.push(p_item);
+        p_item = p_item->childs.back();
+    }
+    stack.push(p_item);
+
+    /* Последовательно удаляем элементы, двигаясь от правых веток к левым */
+    while(stack.size() != 1)    // На вершине стеканаходится самый правый нижний узел
+    {                           // != 1 иначе p_item = stack.top() (после stack.pop()) мокажет указывать на пустоту
+        /* Удаляем самый правый нижний элемент
+            из памяти, стэка и вектора childs */
+        delete stack.top();
+        stack.pop();
+        p_item = stack.top();
+        p_item->childs.pop_back();
+
+        /* Спускаемся на новый самый правый нижний узел. Промежуточные узлы в стеке */
+        while (!p_item->childs.empty())
+        {
+            p_item = p_item->childs.back();
+            stack.push(p_item);
+        }
+    }
+
+    /* Удаление требуемого узла: */
+    delete stack.top();
+    stack.pop();
+    if (this->location_sequence_of_data.back() == TEXT)
+    {
+        this->location_sequence_of_data.pop_back();
+        this->location_sequence_of_data.back() = TEXT;
+    }
+    else
+        this->location_sequence_of_data.pop_back();
+    this->childs.pop_back();
+}
+
 
 //==========================================================
 
 /* === ParserTree === */
 
-/* Create and destroy tree; Public */
+// Конструктор:
 ParserTree::ParserTree(const std::string& text)
-    : rude_text(text), root_item(new ParserTreeItem(KeyType(""), 0, 0)), error_discription()
+    : rude_text(text), root_item(new ParserTreeItem(KeyType(""), 0, 0)), error_description()
 {
-    /* Check text fo empty */
+    /* Проверка на пустую строку */
     if (rude_text.empty())
-        error_discription += "Input text is empty;\n";
+        error_description += "Input text is empty;\n";
 
-    /* Read keys from file */
-    std::ifstream fin(Tag_list_filename.c_str());
+    /* Считываем список ключей с файла */
+    std::ifstream fin(Key_list_filename);
     if (!fin.is_open())
     {
-        error_discription += "File with tag list can't be opened;\n";
+        error_description += "File with tag list can't be opened;\n";
         return;
     }
     readKeysFromFile(fin);
     fin.close();
 
-    /* Find all keys postition and put result to key_positions
-     *   with check for text correctness, sort if needed */
+    /* Находим все позиции ключей, результат в векторе key_positions */
     bool saccess;
     saccess = findAllKeyPosition(rude_text);
     if (saccess == false)
-        error_discription += "Input text can't be parsing to tree;\n";
+        error_description += "Input text can't be parsing to tree;\n";
 
-    auto sort_compare = [](KeyPositionType a, KeyPositionType b) { return a.begin_key_area_pos < b.begin_key_area_pos; };
+    /* Если необходимо - сортируем ключи в порядки появления в тексте */
+    auto sort_compare = [](KeyPositionType a, KeyPositionType b)
+    {
+        return a.getBeginKeyAreaPosition() < b.getBeginKeyAreaPosition();
+    };
     if (saccess == true && !std::is_sorted(key_positions.cbegin(), key_positions.cend(), sort_compare))
         std::sort(key_positions.begin(), key_positions.end(), sort_compare);
 }
 
 
-// TODO: Describe errors
+// Создать дерево:
+// TODO: Описать ошибки (строка, которую не обработать)
 bool ParserTree::createTree()
 {
-    /* Check errors, that necessary */
-    if (error_discription.empty() == false)
+    /* Проверка на ошибки, созданные в конструкторе */
+    if (error_description.empty() == false)
         return false;
 
-    /* Create tree by recursive function SubTree */
+    /* Создаем дерево рекурсивной функцией SubTree */
     try
     {
         unsigned int vector_position = 0;
@@ -72,6 +153,7 @@ bool ParserTree::createTree()
     }
     catch (std::bad_alloc)
     {
+        error_description += "Not enough memory;\n";
         return false;
     }
 
@@ -79,45 +161,27 @@ bool ParserTree::createTree()
 }
 
 
+// Деструктор:
 ParserTree::~ParserTree()
 {
-    ParserTreeItem* pItem = root_item;
-    ParserTreeItemStack stack;
-    while(!pItem->childs.empty())
-    {
-        stack.push(pItem);
-        pItem = pItem->childs[pItem->childs.size() - 1];
-    }
-    stack.push(pItem);
-
-    while(stack.size() != 1)    // on top of stack always most column-right
-    {                           // != 1 else pItem->child reference to hollowness and .pop_back() lead to error
-        delete stack.top();
-        stack.pop();
-        pItem = stack.top();
-        pItem->childs.pop_back();
-
-        while (!pItem->childs.empty())
-        {
-            pItem = pItem->childs[pItem->childs.size() - 1];
-            stack.push(pItem);
-        }
-    }
-    delete stack.top();
+    while (root_item->getChilds().empty() == false)
+        root_item->deleteLastChild();
+    delete root_item;
 }
 
 
-/* Find items; Public */
+// Поиск данных по ключу:
 // TODO: ParserTree::find()
 ParserTree& ParserTree::find(const KeyType& key)
 {
-    if (key.name != "")
+    if (key.getName() != "")
         return *this;
     return *this;
 }
 
 
-/* Create sub trees (recursive function); Protected */
+// Вспомоготельные функции:
+// Создаем поддерево (рекурсивно):
 void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude_text_pos,
                            unsigned int& vector_pos, ParserTreeItem& item)
 {
@@ -127,23 +191,23 @@ void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude
     while (text_pos != end_rude_text_pos)
     {
         /* Add new item */
-        if (vector_pos < key_positions.size() && text_pos == key_positions[vector_pos].begin_key_area_pos)
+        if (vector_pos < key_positions.size() && text_pos == key_positions[vector_pos].getBeginKeyAreaPosition())
         {
-            ParserTreeItem * p_child = new ParserTreeItem(KeyType(rude_text.substr(text_pos, key_positions[vector_pos].begin_data_pos - text_pos)),
-                                                                             item.row + 1, item.childs.size());
-            item.addChild(*p_child);
+            ParserTreeItem * p_child = new ParserTreeItem(
+                        KeyType(rude_text.substr(text_pos, key_positions[vector_pos].getBeginDataPosition() - text_pos)), item.getRow() + 1, item.getChilds().size());
+            item.addChild(p_child);
             vector_pos_stack.push(vector_pos);
             vector_pos++;
-            SubTree(key_positions[vector_pos - 1].begin_data_pos, key_positions[vector_pos - 1].end_data_pos, vector_pos, *p_child);
-            text_pos = key_positions[vector_pos_stack.top()].end_key_area_pos;
+            SubTree(key_positions[vector_pos - 1].getBeginDataPosition(), key_positions[vector_pos - 1].getEndDataPosition(), vector_pos, *p_child);
+            text_pos = key_positions[vector_pos_stack.top()].getEndKeyAreaPosition();
             vector_pos_stack.pop();
         }
         /* Add new text */
         else
         {
             unsigned int end_temp_pos;
-            if (vector_pos < key_positions.size() && key_positions[vector_pos].begin_key_area_pos < end_rude_text_pos)
-                end_temp_pos = key_positions[vector_pos].begin_key_area_pos;
+            if (vector_pos < key_positions.size() && key_positions[vector_pos].getBeginKeyAreaPosition() < end_rude_text_pos)
+                end_temp_pos = key_positions[vector_pos].getBeginKeyAreaPosition();
             else
                 end_temp_pos = end_rude_text_pos;
             item.addText(rude_text.substr(text_pos, end_temp_pos - text_pos));
@@ -153,30 +217,35 @@ void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude
 }
 
 
-/* Set keys (set) from file; protected */
+// Считать список ключей с файла:
 bool ParserTree::readKeysFromFile(std::ifstream& fin)
 {
+    /* Проверка на успешность открытия файла */
+    if (!fin.is_open())
+        return false;
+
+    /* Считывание строк с файла */
     std::string cur_str;
     std::getline(fin, cur_str);
     while (fin)
     {
-        cur_str += '\n';
-        /* Skip string start from '#' */
+        cur_str += '\n';       // Восстановление исходной строки (как в файле)
+        /* Пропускаем строки, начинающиеся с '#' */
         if (cur_str[0] == '#')
         {
             std::getline(fin, cur_str);
             continue;
         }
-        /* Skip emty string */
+        /* Пропускаем пустые строки */
         if (cur_str.find_first_not_of(" \t\n") == std::string::npos)
         {
             std::getline(fin, cur_str);
             continue;
         }
 
-        /* Set keys */
+        /* Устанавливаем ключи */
         unsigned int  begin_key_word = cur_str.find_first_not_of(" \t\n");
-        unsigned int end_key_word =  begin_key_word;
+        unsigned int end_key_word;
         std::string key_word;
         while ( begin_key_word < cur_str.size())
         {
@@ -186,6 +255,7 @@ bool ParserTree::readKeysFromFile(std::ifstream& fin)
             begin_key_word = cur_str.find_first_not_of(" \t\n", end_key_word + 1);
         }
 
+        /* Считываем следующую строку */
         std::getline(fin, cur_str);
     }
 
@@ -232,8 +302,8 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
 /* Helpful function to find keywords */
 unsigned int ParserTree::findBeginKeyAreaPosition(const std::string& s, unsigned int begin_pos, const KeyType& key) const
 {
-    unsigned int whitespace_pos = key.name.find(' ');
-    const std::string& key_word = key.name.substr(0, whitespace_pos - 1);
+    unsigned int whitespace_pos = key.getName().find(' ');
+    const std::string& key_word = key.getName().substr(0, whitespace_pos - 1);
     unsigned int find1 = s.find(key_word + '>', begin_pos);
     unsigned int find2 = s.find(key_word + ' ', begin_pos);
     return find1 < find2 ? find1 : find2;
@@ -247,8 +317,8 @@ unsigned int ParserTree::findBeginDataPosition(const std::string& s, unsigned in
 unsigned int ParserTree::findEndDataPosition(const std::string& s, unsigned int begin_data_pos, const KeyType& key) const
 {
     int count_nested_same_name_keys = 0;
-    unsigned int whitespace_pos = key.name.find(' ');
-    const std::string end_key_str = key.name.substr(whitespace_pos + 1);
+    unsigned int whitespace_pos = key.getName().find(' ');
+    const std::string end_key_str = key.getName().substr(whitespace_pos + 1);
     unsigned int find_begin, find_end;
     unsigned int end_key_word;
 
@@ -277,7 +347,7 @@ unsigned int ParserTree::findEndKeyAreaPosition(const std::string& s, unsigned i
 
 
 /* Show methods */
-std::string ParserTree::outResult() const
+std::string ParserTree::outASCIITree() const
 {
     if (rude_text.empty())
         return "";
@@ -294,72 +364,78 @@ std::string ParserTree::outResult() const
     typedef std::pair<ParserTreeItem*, ItemOutputState> ItemAndState;
     std::stack<ItemAndState, std::vector<ItemAndState>> stack;
 
-    const ParserTreeItem* pItem;
-    ItemOutputState* pState;
-    std::stringstream sstream;
+    const ParserTreeItem* p_item;
+    ItemOutputState* p_state;
+    std::string output;
 
     stack.push(ItemAndState(root_item, zero_state));
-    pItem = stack.top().first;
-    pState = &stack.top().second;
+    p_item = stack.top().first;
+    p_state = &stack.top().second;
 
     while (!stack.empty())
     {
         /* New key area */
-        if (pState->location_sequence_num == 0)
+        if (p_state->location_sequence_num == 0)
         {
-            writeWithIndention(sstream, indent, pItem->row, std::string("@" + pItem->key.name + "\n"));
-            writeWithIndention(sstream, indent, pItem->row, "//====================\n");
+            writeWithIndention(output, indent, p_item->getRow(), std::string("@" + p_item->getKey().getName() + "\n"));
+            writeWithIndention(output, indent, p_item->getRow(), "//====================\n");
         }
 
         // 'end key area' place immediatly after 'new key area' in case of empty key data
 
         /* End key area */
-        if (pState->location_sequence_num == pItem->location_sequence_of_data.size())
+        if (p_state->location_sequence_num == p_item->getLocationSequenceOfData().size())
         {
-            writeWithIndention(sstream, indent, pItem->row, "\\\\====================\n");
+            writeWithIndention(output, indent, p_item->getRow(), "\\\\====================\n");
             stack.pop();
             if (stack.empty() == false)
             {
-                pItem = stack.top().first;
-                pState = &stack.top().second;
+                p_item = stack.top().first;
+                p_state = &stack.top().second;
             }
             continue;
         }
 
         /* Key data */
-        if (pItem->location_sequence_of_data.empty() == false)
+        if (p_item->getLocationSequenceOfData().empty() == false)
         {
-            if (pItem->location_sequence_of_data[pState->location_sequence_num] == ParserTreeItem::TEXT)
+            if (p_item->getLocationSequenceOfData()[p_state->location_sequence_num] == ParserTreeItem::TEXT)
             {
-                writeWithIndention(sstream, indent, pItem->row + 1, "[" + pItem->texts[pState->text_num]);
-                if (pItem->texts[pState->text_num].back() == '\n')
-                    writeWithIndention(sstream, indent, pItem->row + 1, "]\n");
+                writeWithIndention(output, indent, p_item->getRow() + 1, "[" + p_item->getTexts()[p_state->text_num]);
+                if (p_item->getTexts()[p_state->text_num].back() == '\n')
+                    writeWithIndention(output, indent, p_item->getRow() + 1, "]\n");
                 else
-                    sstream << "]\n";
-                pState->text_num++;
-                pState->location_sequence_num++;
+                    output += "]\n";
+                p_state->text_num++;
+                p_state->location_sequence_num++;
             }
             else
             {
-                pState->child_num++;
-                pState->location_sequence_num++;
-                stack.push(ItemAndState(pItem->childs[pState->child_num - 1], zero_state));
+                p_state->child_num++;
+                p_state->location_sequence_num++;
+                stack.push(ItemAndState(p_item->getChilds()[p_state->child_num - 1], zero_state));
             }
         }
 
         /* Set last item-state */
-        pItem = stack.top().first;
-        pState = &stack.top().second;
+        p_item = stack.top().first;
+        p_state = &stack.top().second;
     }
 
-    return sstream.str();
+    return output;
 }
+
+
+// Чтение полей класса:
+const std::string& ParserTree::getRudeText() const              { return rude_text; }
+const std::string& ParserTree::getErrorDescription() const      { return error_description; }
 
 
 //=======================================================
 
 /* === Other funtion === */
-void writeWithIndention(std::stringstream &sstream, const std::string& indent, int count_indent, const std::string& s)
+// TODO: Заменить поледний for на std::copy
+void writeWithIndention(std::string &output, const std::string& indent, int count_indent, const std::string& s)
 {
     unsigned int last_pos = -1;
     unsigned int prev_pos;
@@ -371,8 +447,8 @@ void writeWithIndention(std::stringstream &sstream, const std::string& indent, i
             last_pos = s.size();
 
         for (int i = 0; i < count_indent; i++)
-            sstream << indent;
+            output += indent;
         for (unsigned int pos = prev_pos; pos <= last_pos; pos++)
-            sstream.put(s[pos]);
+            output += s[pos];
     }
 }
