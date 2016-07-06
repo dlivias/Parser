@@ -11,6 +11,13 @@
  */
 static void writeWithIndention(std::string& output, const std::string& indent, int count_indent, const std::string& s);
 
+/* === KeyType == */
+KeyType::KeyType(const std::string& key_name) : name(key_name), search_position_functions(findSearchFunction(key_name))
+{
+}
+
+//===============================================
+
 
 /* === ParserTreeItem === */
 // Конструктор:
@@ -277,16 +284,16 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
     {
         while (find_current_pos != find_end_pos)
         {
-            begin_key_area_pos = findBeginKeyAreaPosition(s, find_current_pos, current_key);
+            begin_key_area_pos = current_key.getFindBeginKeyAreaPosition()(s, find_current_pos, current_key.getName(), *this);
             if (begin_key_area_pos == std::string::npos)
                 break;
-            begin_data_pos = findBeginDataPosition(s, begin_key_area_pos, current_key);
+            begin_data_pos = current_key.getFindBeginDataPosition()(s, begin_key_area_pos, current_key.getName(), *this);
             if (begin_data_pos == std::string::npos)
                 return false;
-            end_data_pos = findEndDataPosition(s, begin_data_pos, current_key);
+            end_data_pos = current_key.getFindEndDataPosition()(s, begin_data_pos, current_key.getName(), *this);
             if (end_data_pos == std::string::npos)
                 return false;
-            end_key_area_pos = findEndKeyAreaPosition(s, end_data_pos, current_key);
+            end_key_area_pos = current_key.getFindEndKeyAreaPosition()(s, end_data_pos, current_key.getName(), *this);
             if (end_key_area_pos == std::string::npos)
                 return false;
 
@@ -298,53 +305,6 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
     }
     return true;
 }
-
-/* Helpful function to find keywords */
-unsigned int ParserTree::findBeginKeyAreaPosition(const std::string& s, unsigned int begin_pos, const KeyType& key) const
-{
-    unsigned int whitespace_pos = key.getName().find(' ');
-    const std::string& key_word = key.getName().substr(0, whitespace_pos - 1);
-    unsigned int find1 = s.find(key_word + '>', begin_pos);
-    unsigned int find2 = s.find(key_word + ' ', begin_pos);
-    return find1 < find2 ? find1 : find2;
-}
-
-unsigned int ParserTree::findBeginDataPosition(const std::string& s, unsigned int begin_key_area_pos, const KeyType& key) const
-{
-    return s.find('>', begin_key_area_pos) + 1;
-}
-
-unsigned int ParserTree::findEndDataPosition(const std::string& s, unsigned int begin_data_pos, const KeyType& key) const
-{
-    int count_nested_same_name_keys = 0;
-    unsigned int whitespace_pos = key.getName().find(' ');
-    const std::string end_key_str = key.getName().substr(whitespace_pos + 1);
-    unsigned int find_begin, find_end;
-    unsigned int end_key_word;
-
-    find_begin = findBeginKeyAreaPosition(s, begin_data_pos, key);
-    find_end = s.find(end_key_str, begin_data_pos);
-
-    /* Treat nested keys */
-    while (find_begin < find_end)
-    {
-        count_nested_same_name_keys++;
-        /* Find next pair start_key - finish_key */
-        end_key_word = findBeginDataPosition(s, find_begin, key);
-        find_begin = findBeginKeyAreaPosition(s, end_key_word, key);
-        end_key_word = findEndKeyAreaPosition(s, find_end, key);
-        find_end = s.find(end_key_str, end_key_word);
-    }
-
-    return find_end;
-    //return s.find(key.name.substr(key.name.find(' ')), begin_data_pos);
-}
-
-unsigned int ParserTree::findEndKeyAreaPosition(const std::string& s, unsigned int end_data_pos, const KeyType& key) const
-{
-    return s.find('>', end_data_pos) + 1;
-}
-
 
 /* Show methods */
 std::string ParserTree::outASCIITree() const

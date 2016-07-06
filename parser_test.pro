@@ -14,7 +14,8 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         parsertest.cpp \
-    parser.cpp
+    parser.cpp \
+    search_functions.cpp
 
 HEADERS  += parsertest.h \
     parser.h

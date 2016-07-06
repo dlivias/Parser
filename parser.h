@@ -13,17 +13,91 @@
 /// Имя файла со списком ключей
 const std::string Key_list_filename = "C:\\Users\\Admin\\Desktop\\parser_test\\tag list.txt";
 
+class ParserTree;
+
 
 /// Ключ
 class KeyType {
+public:
+    // Новые типы данных:
+    /// Тип функции для поиска позиции
+    typedef unsigned int (*FindPositionFunctionType)(const std::string& s, unsigned int begin_position, const std::string& key_name, const ParserTree& tree);
+
+    /// Функции поиска позиций
+    struct SearchPositionFunctions {
+        // Указатели на функции поиска позиций:
+        /** Поиск начала ключевой области
+         * @param [in] s - строка, в которой выполняется поиск
+         * @param [in] begin_pos - позиция, с которой начинается поиск
+         * @param [in] tree - дерево, которое вызывает функцию
+         * @return позиция начала ключевой области в строке
+         */
+        unsigned int (*find_begin_key_area_position)(const std::string& s, unsigned int begin_pos, const std::string& key_name, const ParserTree& tree);
+
+        /** Поиск начала данных ключа
+         * @param [in] s - строка, в которой выполняется поиск
+         * @param [in] begin_key_area_pos - позиция, с которой начинается поиск
+         * @param [in] tree - дерево, которое вызывает функцию
+         * @return позиция начала данных ключа в строке
+         */
+        unsigned int (*find_begin_data_position)(const std::string& s, unsigned int begin_key_area_pos, const std::string& key_name, const ParserTree& tree);
+
+        /** Поиск конца данных ключа
+         * @param [in] s - строка, в которой выполняется поиск
+         * @param [in] begin_data_pos - позиция, с которой начинается поиск
+         * @param [in] tree - дерево, которое вызывает функцию
+         * @return позиция конца данных ключа в строке
+         */
+        unsigned int (*find_end_data_position)(const std::string& s, unsigned int begin_data_pos, const std::string& key_name, const ParserTree& tree);
+
+        /** Поиск конца ключевой области
+         * @param s - строка, в которой выполняется поиск
+         * @param end_data_pos - позиция, с которой начинается поиск
+         * @param tree - дерево, которое вызывает функцию
+         * @return позиция конца ключевой области в строке
+         */
+        unsigned int (*find_end_key_area_position)(const std::string& s, unsigned int end_data_pos, const std::string& key_name, const ParserTree& tree);
+    };
+
 private:
     /// Имя
     std::string name;
+    /// Функции поиска позиций
+    SearchPositionFunctions search_position_functions;
+
 public:
     /** Конструктор
-     * @param [in] name - Имя ключа
+     * @param [in] name - имя ключа
+     * @param [in] functionFindBeginKeyAreaPosition - функция поиска начала ключевой области
+     * @param [in] functionFindBeginDataPosition - функция поиска начала данных ключа
+     * @param [in] functionFindEndDataPosition - функция поиска конца данных ключа
+     * @param [in] functionFindEndKeyAreaPosition - функция поиска конца ключевой области
+     * @sa findBeginKeyAreaPosition, findBeginDataPosition, findEndDataPosition, findEndKeyAreaPosition
      */
-    explicit KeyType(const std::string& key_name)   : name(key_name) {}
+    KeyType(const std::string& key_name,
+            const FindPositionFunctionType functionFindBeginKeyAreaPosition,
+            const FindPositionFunctionType functionFindBeginDataPosition,
+            const FindPositionFunctionType functionFindEndDataPosition,
+            const FindPositionFunctionType functionFindEndKeyAreaPosition)
+        : name(key_name)
+    {
+        search_position_functions =  {
+            functionFindBeginKeyAreaPosition, functionFindBeginDataPosition,
+            functionFindEndDataPosition, functionFindEndKeyAreaPosition
+        };
+    }
+
+    /** Конструктор со структурой
+     * @param [in] name - имя ключа
+     * @param [in] search_pos_functions - функции поиска позиций (структура)
+     */
+    KeyType(const std::string& key_name, const SearchPositionFunctions& search_pos_functions)
+        : name(key_name), search_position_functions(search_pos_functions) {}
+
+    /** Упрощённый конструктор
+     * @param key_name - имя ключа
+     */
+    KeyType(const std::string& key_name);
 
     /** Оператор сравнения
      * @param [in] key - ключ, с которым сравниваем
@@ -31,19 +105,42 @@ public:
      */
     bool operator<(KeyType key) const               { return name < key.name; }
 
+
+    // Чтение полей класса:
     /** Чтение имени ключа
      * @return имя ключа
      */
     const std::string& getName() const              { return name; }
+
+    /** Чтение функции поиска начала ключевой области
+     * @return функция поиска начала ключевой области
+     */
+    const FindPositionFunctionType& getFindBeginKeyAreaPosition() const        { return search_position_functions.find_begin_key_area_position; }
+
+    /** Чтение функции поиска начала данных ключа
+     * @return Функция поиска начала данных ключа
+     */
+    const FindPositionFunctionType& getFindBeginDataPosition() const           { return search_position_functions.find_begin_data_position; }
+
+    /** Чтение функции поиска конца данных ключа
+     * @return функция поиска конца данных ключа
+     */
+    const FindPositionFunctionType& getFindEndDataPosition() const             { return search_position_functions.find_end_data_position; }
+
+    /** Чтение функции поиска конца ключевой области
+     * @return функция поиска конца ключевой области
+     */
+    const FindPositionFunctionType& getFindEndKeyAreaPosition() const          { return search_position_functions.find_end_key_area_position; }
 };
+
+/// Функция нахождения search_position_function
+const KeyType::SearchPositionFunctions findSearchFunction(const std::string& key_name);
 
 
 /// Ключ с его местоположением в строке
 class KeyPositionType {
-private:
-    // Данные:
-    /// Ключ
-    KeyType key;
+public:
+    // Новые типы данных:
     /** Местоположение ключа
      * @details Строка, к которой относятся позиции, не указывается
      * Порядок следования позиций:
@@ -53,8 +150,16 @@ private:
      * - begin_data_pos     =  Позиция буквы Д (в слове Данные)
      * - end_data_pos       =  Позиция буквы К (в слове Конец)
      */
-    unsigned int begin_key_area_pos, end_key_area_pos;  ///< Начало и конец зоны действия ключа
-    unsigned int begin_data_pos, end_data_pos;          ///< Начало и конец данных ключа
+    struct Positions
+    {
+        unsigned int begin_key_area_pos, end_key_area_pos;  ///< Начало и конец зоны действия ключа
+        unsigned int begin_data_pos, end_data_pos;          ///< Начало и конец данных ключа
+    };
+
+private:
+    // Данные:
+    KeyType key;            ///< Ключ
+    Positions positions;    ///< Местоположение ключа
 
 public:
     // Конструкторы:
@@ -66,15 +171,25 @@ public:
      * @param [in] end_data_position - позиция конца данных ключа
      */
     KeyPositionType(const KeyType& k, unsigned int begin_key_area_position, unsigned int end_key_area_position,
-                        unsigned int begin_data_position, unsigned int end_data_position)
-        : key(k), begin_key_area_pos(begin_key_area_position), end_key_area_pos(end_key_area_position),
-          begin_data_pos(begin_data_position), end_data_pos(end_data_position) {}
+                    unsigned int begin_data_position, unsigned int end_data_position)
+        : key(k)
+    {
+        positions = {
+            begin_key_area_position, end_key_area_position,
+            begin_data_position, end_data_position };
+    }
 
-    /** Базовый конструктор
-     * @details Имя ключа = none;
-     * Любая позиция ключа = 0;
+    /** Конструктор со структурой
+     * @param k - ключ
+     * @param poss - местоположение ключа
      */
-    KeyPositionType() : key("none") {}
+    KeyPositionType(const KeyType& k, const Positions& poss) : key(k), positions(poss) {}
+
+    /** Упрощённый конструктор
+     * @details Любая позиция ключа = 0
+     * @param k - ключ
+     */
+    explicit KeyPositionType(KeyType k) : key(k) { positions = {}; }
 
     // Чтение полей класса:
     /** Чтение ключа
@@ -85,22 +200,22 @@ public:
     /** Чтение позиции начала зоны действия ключа
      * @return Позиция начала зоны действия ключа
      */
-    unsigned int getBeginKeyAreaPosition() const      { return begin_key_area_pos; }
+    unsigned int getBeginKeyAreaPosition() const      { return positions.begin_key_area_pos; }
 
     /** Чтение позиции конца зоны действия ключа
      * @return Позиция конца зоны действия ключа
      */
-    unsigned int getEndKeyAreaPosition() const        { return end_key_area_pos; }
+    unsigned int getEndKeyAreaPosition() const        { return positions.end_key_area_pos; }
 
     /** Чтение позиции начала данных ключа
      * @return Позиция начала данных ключа
      */
-    unsigned int getBeginDataPosition() const         { return begin_data_pos; }
+    unsigned int getBeginDataPosition() const         { return positions.begin_data_pos; }
 
     /** Чтение позиции конца данных ключа
      * @return Позиция конца данных ключа
      */
-    unsigned int getEndDataPosition() const           { return end_data_pos; }
+    unsigned int getEndDataPosition() const           { return positions.end_data_pos; }
 
     // Установка полей класса:
     /** Установка ключа
@@ -111,22 +226,22 @@ public:
     /** Установка позиции начала зоны действия ключа
      * @param [in] new_position -  Новая позиция начала зоны действия ключа
      */
-    void setBeginKeyAreaPosition(unsigned int new_position)   { begin_key_area_pos = new_position; }
+    void setBeginKeyAreaPosition(unsigned int new_position)   { positions.begin_key_area_pos = new_position; }
 
     /** Установка позиции конца зоны действия ключа
      * @param [in] new_position - Новая позиция конца зоны действия ключа
      */
-    void setEndKeyAreaPosition(unsigned int new_position)     { end_key_area_pos = new_position; }
+    void setEndKeyAreaPosition(unsigned int new_position)     { positions.end_key_area_pos = new_position; }
 
     /** Установка позиции начала данных ключа
      * @param [in] new_position - Новая позиция начала данных ключа
      */
-    void setBeginDataPosition(unsigned int new_position)      { begin_data_pos = new_position; }
+    void setBeginDataPosition(unsigned int new_position)      { positions.begin_data_pos = new_position; }
 
     /** Установка позиции конца данных ключа
      * @param [in] new_position - Новая позиция конца данных ключа
      */
-    void setEndDataPosition(unsigned int new_position)        { end_data_pos = new_position; }
+    void setEndDataPosition(unsigned int new_position)        { positions.end_data_pos = new_position; }
 };
 
 
@@ -256,6 +371,7 @@ public:
      */
     ~ParserTree();
 
+
     // Основные методы:
     /** Считывание ключей с файла
      * @param fin - файл
@@ -274,6 +390,7 @@ public:
      */
     std::string outASCIITree() const;
 
+
     // Чтение полей класса:
     /** Чтение исходного текста
      * @return исходный текст
@@ -289,11 +406,6 @@ protected:
     // TODO: Зодокументировать
     // Вспомогательные методы:
     bool findAllKeyPosition(const std::string& s);    
-    unsigned int findBeginKeyAreaPosition(const std::string& s, unsigned int begin_pos, const KeyType& key) const;
-    unsigned int findBeginDataPosition(const std::string& s, unsigned int begin_key_area_pos, const KeyType& key) const;
-    unsigned int findEndDataPosition(const std::string& s, unsigned int begin_data_pos, const KeyType& key) const;
-    unsigned int findEndKeyAreaPosition(const std::string& s, unsigned int end_data_pos, const KeyType& key) const;
-
     void SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude_text_position,
                   unsigned int &vector_pos, ParserTreeItem& item);
 };
