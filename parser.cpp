@@ -227,6 +227,13 @@ void ParserTree::SubTree(unsigned int begin_rude_text_pos, unsigned int end_rude
 // Считать список ключей с файла:
 bool ParserTree::readKeysFromFile(std::ifstream& fin)
 {
+    const std::string empty_element[] = {
+        "area", "base", "br", "col", "command", "embed", "hr", "img",
+        "input", "keygen", "link", "meta", "param", "source", "track", "wbr"
+    };
+    const std::string * p_str_begin = empty_element;
+    const std::string * p_str_end = empty_element + sizeof(empty_element) / sizeof(*empty_element);
+
     /* Проверка на успешность открытия файла */
     if (!fin.is_open())
         return false;
@@ -258,7 +265,10 @@ bool ParserTree::readKeysFromFile(std::ifstream& fin)
         {
             end_key_word = cur_str.find_first_of(" \t\n",  begin_key_word);
             key_word = std::move(cur_str.substr( begin_key_word, end_key_word -  begin_key_word));
-            keys.insert(KeyType("<" + key_word + "> </" + key_word + ">"));
+            if (std::find(p_str_begin, p_str_end, key_word) != p_str_end)
+                keys.insert(KeyType("<" + key_word + ">"));
+            else
+                keys.insert(KeyType("<" + key_word + "> </" + key_word + ">"));
             begin_key_word = cur_str.find_first_not_of(" \t\n", end_key_word + 1);
         }
 
@@ -278,6 +288,9 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
     unsigned int begin_data_pos, end_data_pos;          // [...)
     unsigned int find_current_pos, find_end_pos;
 
+    /* Для каждого ключа проходим по всей строке, выискивая его позиции.
+     *   при успешном нахождении ключа ищем все остальные его точки и запоминаем их,
+     *   затем продолжаем поиск с начала данных последнего ключа */
     find_current_pos = 0;
     find_end_pos = s.size();
     for (KeyType current_key : keys)
@@ -287,15 +300,33 @@ bool ParserTree::findAllKeyPosition(const std::string& s)
             begin_key_area_pos = current_key.getFindBeginKeyAreaPosition()(s, find_current_pos, current_key.getName(), *this);
             if (begin_key_area_pos == std::string::npos)
                 break;
+
             begin_data_pos = current_key.getFindBeginDataPosition()(s, begin_key_area_pos, current_key.getName(), *this);
             if (begin_data_pos == std::string::npos)
+            {
+                error_description += "Can't find begin data position by " + current_key.getName() + "\n";
+                error_description += "    search start from " + std::to_string(begin_key_area_pos) + " (";
+                error_description += s.substr(begin_key_area_pos, 20) + "...)\n";
                 return false;
+            }
+
             end_data_pos = current_key.getFindEndDataPosition()(s, begin_data_pos, current_key.getName(), *this);
             if (end_data_pos == std::string::npos)
+            {
+                error_description += "Can't find end data position by " + current_key.getName() + "\n";
+                error_description += "    search start from " + std::to_string(begin_data_pos) + " (";
+                error_description += s.substr(begin_data_pos, 20) + "...)\n";
                 return false;
+            }
+
             end_key_area_pos = current_key.getFindEndKeyAreaPosition()(s, end_data_pos, current_key.getName(), *this);
             if (end_key_area_pos == std::string::npos)
+            {
+                error_description += "Can't find end key area position by " + current_key.getName() + "\n";
+                error_description += "    search start from " + std::to_string(end_data_pos) + " (";
+                error_description += s.substr(end_data_pos, 20) + "...)\n";
                 return false;
+            }
 
             key_positions.push_back(KeyPositionType(current_key, begin_key_area_pos, end_key_area_pos,
                                                    begin_data_pos, end_data_pos));

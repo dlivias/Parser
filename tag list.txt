@@ -2,42 +2,42 @@
 # From this tag deleted some special and empty items
 
 # By Category
-# The Root Element
+#The Root Element
 
     html
 
-# Metadata
+#Metadata
 
-    head title
+    head title base link meta style
 
-# Sections
+#Sections
 
     body article section nav aside h1 h2 h3 h4 h5 h6 header footer address
 
-# Grouping
+#Grouping
 
-    p pre blockquote ol ul li dl dt dd figure figcaption div main
+    p pre blockquote ol ul li dl dt dd figure figcaption div main hr
 
-# Text
+#Text
 
-    a em strong cite q dfn abbr data time code var samp kbd mark ruby rb rt rp rtc bdi bdo span small i b u s sub sup
+    a em strong cite q dfn abbr data time code var samp kbd mark ruby rb rt rp rtc bdi bdo span br wbr small i b u s sub sup
 
-# Edits
+#Edits
 
     ins del
 
-# Embedded Content
+#Embedded Content
 
-    object video audio map iframe
+    img embed object param video audio source track map area iframe
 
-# Tables
+#Tables
 
-    table tr td th caption tbody thead tfoot colgroup
+    table tr td th caption tbody thead tfoot colgroup col
 
-# Forms
+#Forms
 
-    form textarea select option optgroup datalist label fieldset legend button output progress meter
+    form input textarea select option optgroup datalist label fieldset legend button output progress meter keygen
 
-# Scripting
+#Scripting
 
-
+    script noscript template canvas
